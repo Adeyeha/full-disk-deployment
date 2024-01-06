@@ -1,0 +1,101 @@
+import streamlit as st
+import pandas as pd
+import os
+import post_hoc_explanation
+from post_hoc_analysis import superimpose_original
+import numpy as np
+import plotly.express as px
+
+def retrieve_npy(filename,root=None):
+    if root is not None:
+        folder = os.path.join('media', root,  *filename.split(' ')[0].split('-'))
+        save_path = os.path.join(folder, f"{filename.replace('-','_').replace(' ','_').replace(':','_')}.npy")
+        return save_path
+
+def retrieve_ar(filename):
+    folder = os.path.join('media', 'noaa_ar',  *filename.split('_')[0:3])
+    save_path = os.path.join(folder,filename)
+    return pd.read_csv(save_path)
+    
+def retrieve_img(filename,extension='svg',root=None):
+    if root is not None:
+        folder = os.path.join('media', root,  *filename.split(' ')[0].split('-'))
+        save_path = os.path.join(folder, f"{filename.replace('-','_').replace(' ','_').replace(':','_')}.{extension}")
+        return save_path
+
+def main():
+    """
+    Streamlit app
+    """
+    st.title("Solar Flare Visualizer")
+    st.sidebar.title("Flare Information")
+
+    db_file = "results.csv"
+    db = pd.read_csv(db_file)
+
+    db = db.sort_values('obs_date',ascending=True)
+    
+    # Convert the 'timestamp' column to a list of strings
+    timestamps_list = sorted(list(set(db['obs_date'].to_list())),reverse=True)
+
+    selected_date = st.sidebar.selectbox(
+        "Choose Record", options=timestamps_list
+    )
+
+    # Configure parameters
+    st.sidebar.title("Boundary Configuration")
+    angle = st.sidebar.slider("Angle", min_value=0, max_value=90, value=20)
+    es_buffer = st.sidebar.slider("ES Buffer", min_value=0, max_value=100, value=5)
+    ws_buffer = st.sidebar.slider("WS Buffer", min_value=0, max_value=100, value=40)
+
+    st.sidebar.title("AR Detection Configuration")
+    lower_threshold = st.sidebar.slider("Lower Threshold", min_value=10, max_value=255, value=10)
+    upper_threshold = st.sidebar.slider("Higher Threshold", min_value=10, max_value=255, value=30)
+
+    st.sidebar.title("Density Configuration")
+    min_samples = st.sidebar.slider("Min. Samples", min_value=1, max_value=10, value=2)
+    distance_threshold = st.sidebar.slider("Distance Threshold", min_value=1, max_value=20, value=2)
+
+    nw_angle = -angle
+    sw_angle =  angle
+
+    # Find the row with the specific timestamp in the DataFrame
+    row = db.loc[db['obs_date'] == selected_date].sort_values('local_request_date',ascending=False).head(1)
+
+    guidedgradcam = retrieve_npy(row['local_request_date'].values[0],'guidedgradcam')
+    original = retrieve_npy(row['local_request_date'].values[0],'original')
+    ar = retrieve_ar(row['noaa_ar_filename'].values[0])
+
+    # Parse flare information
+    ar_names = ar.noaa_ar_no.to_list()
+    ar_lat =  ar.latitude.to_list()
+    ar_lon =  ar.longitude.to_list()
+
+    pix_list = [post_hoc_explanation.convert_to_pix(float(x[0]),float(x[1])) for x in zip(ar_lat,ar_lon)]
+    flares = [item for item in list(zip(ar_names,pix_list))]
+
+    # Analyze attention map
+    bounding_hulls_img, distances_df, score, ratio = post_hoc_explanation.explain(guidedgradcam, flares, nw_angle, sw_angle, es_buffer, ws_buffer,lower_threshold,upper_threshold,min_samples,distance_threshold, numpy=True)
+
+    col1, col2 = st.columns(2)
+    col1.image(np.load(original), caption="Original Image", use_column_width=True)
+
+    # Superimposed Image - Original & Attention
+    superimposed = superimpose_original(np.load(original), np.load(guidedgradcam))
+
+    col2.image(superimposed, caption="Superimposed Image", use_column_width=True)
+
+    st.image(bounding_hulls_img,caption="Explained Image", use_column_width=True)
+
+    col1, col2 = st.columns(2)
+    col1.write(distances_df)
+    col2.write(f"Flare Probability = {row['flare_probabilty'].values[0]}")
+    col2.write(f"Proximity Score = {score}")
+    col2.write(f"Collocation Ratio = {ratio}")
+    
+    st.markdown("**NB** : The **Proximity Score** measures the closeness of Active Regions to bounding regions, indicating the model's attention/focus in making predictions.")
+    st.markdown("**NB** : The **Collocation Ratio** represents the percentage of Active Regions that fall within bounding regions.")
+
+
+if __name__ == "__main__":
+    main()

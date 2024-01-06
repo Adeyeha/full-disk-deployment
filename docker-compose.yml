@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  app:
+    container_name: full_disk_prediction
+    image: adeyehat/solar_flare_prediction:latest
+    build: .
+    ports:
+      - "8502:8501"
+    volumes:
+      - .:/app
+    restart: always
