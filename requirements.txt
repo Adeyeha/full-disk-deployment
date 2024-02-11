@@ -11,3 +11,8 @@ matplotlib
 opencv-python-headless
 streamlit
 plotly
+fastapi
+uvicorn 
+python-multipart
+python-dotenv
+gunicorn

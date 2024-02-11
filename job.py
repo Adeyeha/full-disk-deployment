@@ -1,31 +1,53 @@
 from deployment import FullDiskFlarePrediction
-import time
 import pandas as pd
 import warnings
+import os
 warnings.filterwarnings('ignore')
+import sqlite3
+from dotenv import load_dotenv
+load_dotenv()
 
 def write_to_csv(result, csv_filename='results.csv'):
-    """
-    Append the result to the specified CSV file. If the file doesn't exist, it creates one.
-    
-    Parameters:
-    - result (dict): The dictionary containing the result.
-    - csv_filename (str): Name of the CSV file to append to or create.
-    """
-    # Convert the result dictionary to a DataFrame
     df = pd.DataFrame([result])
+    df.to_csv(csv_filename, mode='a', header=not os.path.exists(csv_filename), index=False)
+
+def make_predictions(save_artefacts=True, include_explain=False):
+    PATH1 = os.getenv('model_path')
+    fdp = FullDiskFlarePrediction(PATH1)
+    return fdp.predict(save_artefacts=save_artefacts, include_explain=include_explain)
+
+def write_to_db(prediction, latest=False):
+    db_name = os.getenv('db_name')
+    table_name = os.getenv('most_recent_record') if latest else os.getenv('all_records')
     
-    # Append the result to the CSV (or create it if it doesn't exist)
-    with open(csv_filename, 'a') as file:
-        df.to_csv(file, header=(not file.tell()), index=False)
+    with sqlite3.connect(db_name) as conn:
+        cur = conn.cursor()
+        if latest:
+            cur.execute(f'DELETE FROM {table_name}')  # Clear the table for latest record
+            
+        cur.execute(f'''
+        INSERT INTO {table_name} (source_date, obs_date, raw_filename, noaa_ar_filename, local_request_date, error, flare_probability, non_flare_probability, explanation)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            prediction['source_date'],
+            prediction['obs_date'],
+            prediction['raw_filename'],
+            prediction['noaa_ar_filename'],
+            prediction['local_request_date'],
+            prediction['error'],
+            float(prediction['flare_probability']),
+            float(prediction['non_flare_probability']),
+            prediction['explanation']
+        ))
+        conn.commit()
 
 def main():
-    #Issuing prediction for M1+ Flares
-    PATH1 = 'trained-models/new-fold1.pth'
-    fdp = FullDiskFlarePrediction(PATH1)
-
     try:
-        write_to_csv(fdp.predict(save_artefacts=True,include_explain=False))
+        prediction = make_predictions(save_artefacts=True, include_explain=False)
+        write_to_csv(prediction)
+        write_to_db(prediction)
+        write_to_db(prediction, latest=True)
+
     except Exception as e:
         print(str(e))
 

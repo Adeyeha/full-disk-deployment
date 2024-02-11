@@ -43,8 +43,8 @@ class FullDiskFlarePrediction:
             'noaa_ar_filename': None,
             'local_request_date': None,
             'error': None,
-            'flare_probabilty': None,
-            'non_flare_probabilty': None,
+            'flare_probability': None,
+            'non_flare_probability': None,
             'explanation': None
         }
         self.__input_hmi = None
@@ -167,7 +167,7 @@ class FullDiskFlarePrediction:
                 with torch.no_grad():
                     out = self.__model(self.__input_hmi)
                     noflare_prob,flare_prob = out[0].detach().numpy()
-                    self.meta['flare_probabilty'], self.meta['non_flare_probabilty'] = flare_prob, noflare_prob
+                    self.meta['flare_probability'], self.meta['non_flare_probability'] = flare_prob, noflare_prob
         except Exception as e:
             self.meta['error'] = str(e)
             raise
@@ -176,7 +176,7 @@ class FullDiskFlarePrediction:
     def __explain(self):
 
         """Run explanation function"""
-        guidedgradcam,original = get_attention_maps(self.__model,self.__input_hmi,self.meta['flare_probabilty'])
+        guidedgradcam,original = get_attention_maps(self.__model,self.__input_hmi,self.meta['flare_probability'])
 
         if self.__save_artefacts == True:
             self.__save_img_array(guidedgradcam, "guidedgradcam")
