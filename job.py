@@ -4,6 +4,7 @@ import warnings
 import os
 warnings.filterwarnings('ignore')
 import sqlite3
+from datetime import datetime, timezone
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -11,11 +12,17 @@ def write_to_csv(result, csv_filename='results.csv'):
     df = pd.DataFrame([result])
     df.to_csv(csv_filename, mode='a', header=not os.path.exists(csv_filename), index=False)
 
-def make_predictions(save_artefacts=True, include_explain=False):
-    PATH1 = os.getenv('model_path')
-    fdp = FullDiskFlarePrediction(PATH1)
-    return fdp.predict(save_artefacts=save_artefacts, include_explain=include_explain)
-
+def make_predictions(date_=datetime.now(timezone.utc),save_artefacts=True, include_explain=False):
+    try:
+        # PATH1 = os.getenv('model_path')
+        # fdp = FullDiskFlarePrediction(PATH1)
+        # return fdp.predict(date_,save_artefacts=save_artefacts, include_explain=include_explain)
+        PATH1 = 'trained-models/Model_resnet_Epoch_27_fold1.pth'
+        fdp = FullDiskFlarePrediction('resnet34',PATH1)
+        return fdp.predict(save_artefacts=True,include_explain=False,explanation_layer=fdp.model.conv1)
+    except Exception as e:
+        return str(e)
+        
 def write_to_db(prediction, latest=False):
     db_name = os.getenv('db_name')
     table_name = os.getenv('most_recent_record') if latest else os.getenv('all_records')

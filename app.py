@@ -10,6 +10,7 @@ def retrieve_npy(filename,root=None):
     if root is not None:
         folder = os.path.join('media', root,  *filename.split(' ')[0].split('-'))
         save_path = os.path.join(folder, f"{filename.replace('-','_').replace(' ','_').replace(':','_')}.npy")
+        print(save_path)
         return save_path
 
 def retrieve_ar(filename):

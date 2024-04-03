@@ -147,7 +147,7 @@ def convert_to_forecast_submission(solar_data_items: List[SolarDataItem], model_
     return forecast_submission
 
 
-@app.get("/last-prediction/", response_model=ForecastSubmissionWrapper)
+@app.get("/last-prediction/", response_model=ForecastSubmissionWrapper, tags=["Data"])
 async def fetch_last_prediction():
     table_name = os.getenv('most_recent_record')
     if not table_name:
@@ -165,17 +165,7 @@ async def fetch_last_prediction():
         raise HTTPException(status_code=500, detail=f"error: {e}")
 
 
-@app.get("/predict/", response_model=ForecastSubmissionWrapper, summary="Generate New Prediction")
-async def predict():
-    """Generate New Predictions"""
-    try:
-        res = make_predictions(save_artefacts=False, include_explain=False) 
-        return convert_to_forecast_submission([SolarDataItem(**res)])
-    except Exception as e:  # Catching a generic exception, adjust based on make_predictions
-        raise HTTPException(status_code=500, detail=f"Prediction error: {e}")
-
-
-@app.get("/data/{obs_date}", response_model=List[SolarDataItem])
+@app.get("/data/{obs_date}", response_model=List[SolarDataItem], tags=["Data"])
 async def fetch_data_by_date(obs_date: str = Path(..., title="Observation Date", description="The observation date in YYYY-MM-DD format")):
     # Validate and format the date
     try:
@@ -198,6 +188,32 @@ async def fetch_data_by_date(obs_date: str = Path(..., title="Observation Date",
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
     finally:
         conn.close()
+
+@app.get("/predict/", response_model=ForecastSubmissionWrapper, summary="Predict with Current Live data", tags=["Prediction"])
+async def predict():
+    """Generate New Predictions"""
+    try:
+        res = make_predictions(save_artefacts=False, include_explain=False) 
+        return convert_to_forecast_submission([SolarDataItem(**res)])
+    except Exception as e:  # Catching a generic exception, adjust based on make_predictions
+        raise HTTPException(status_code=500, detail=f"Prediction error: {e}")
+
+
+@app.get("/predict/{obs_datetime}", response_model=ForecastSubmissionWrapper,  summary="Predict for Past Date", tags=["Prediction"])
+async def predict_by_date(obs_datetime: str = Path(..., title="Observation Datetime", description="The observation datetime in YYYY-MM-DD HH24:MM:SS format")):
+    """Generate New Predictions"""
+    # Validate and format the date
+    try:
+        valid_obs_datetime = datetime.strptime(obs_datetime,os.getenv("date_format"))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Date must be in YYYY-MM-DD HH24:MM:SS format.")
+    
+    try:
+        res = make_predictions(valid_obs_datetime,save_artefacts=False, include_explain=False) 
+        return convert_to_forecast_submission([SolarDataItem(**res)])
+    except Exception as e:  # Catching a generic exception, adjust based on make_predictions
+        raise HTTPException(status_code=500, detail=f"Prediction error: {e}")
+
 
 
 # if __name__ == "__main__":
