@@ -16,3 +16,5 @@ uvicorn
 python-multipart
 python-dotenv
 gunicorn
+scikit-image
+seaborn
