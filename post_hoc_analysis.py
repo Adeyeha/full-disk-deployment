@@ -1,5 +1,4 @@
-from captum.attr import GuidedGradCam
-from captum.attr import visualization as viz
+from captum.attr import GuidedGradCam,IntegratedGradients, DeepLiftShap, Saliency
 import numpy as np
 import cv2 as cv
 
