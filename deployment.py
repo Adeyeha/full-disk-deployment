@@ -29,9 +29,12 @@ class FullDiskFlarePrediction:
 
     def __setup_config(self):
         """Set up configuration parameters."""
-        self.__obs_date_pattern = re.compile(br'<DATE-OBS>(.*?)</DATE-OBS>')
-        self.__source_date_pattern = re.compile(br'<DATE>(.*?)</DATE>')
-        self.__filename_pattern = re.compile(r'filename="([^"]+)"')
+        # self.__obs_date_pattern = re.compile(br'<DATE-OBS>(.*?)</DATE-OBS>')
+        # self.__source_date_pattern = re.compile(br'<DATE>(.*?)</DATE>')
+        # self.__filename_pattern = re.compile(r'filename="([^"]+)"')
+        self.__obs_date_pattern = [re.compile(br'<DATE-OBS>(.*?)</DATE-OBS>'),re.compile(br'<DATE_OBS>(.*?)</DATE_OBS>'),re.compile(br'<DATE_OB>(.*?)</DATE_OB>')]
+        self.__source_date_pattern = [re.compile(br'<DATE>(.*?)</DATE>')]
+        self.__filename_pattern = [re.compile(r'filename="([^"]+)"')]
         self.__media_folder = 'media'
         self.__request_uri = 'https://api.helioviewer.org/v2/getJP2Image/?date='
         self.__mirror_request_uri = 'https://helioviewer-api.ias.u-psud.fr//v2/getJP2Image/?date='
@@ -45,21 +48,44 @@ class FullDiskFlarePrediction:
             'error': None,
             'flare_probability': None,
             'non_flare_probability': None,
-            'explanation': None
+            'explanation': None,
+            'artefacts' : dict()
+
         }
         self.__input_hmi = None
         self.__model = None
         self.__include_explain = False
         self.__save_artefacts = False
 
+    # @staticmethod
+    # def __convert_date_format(date_str):
+    #     """Convert date string to desired format."""
+    #     try:
+    #         return datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%SZ").strftime('%Y-%m-%d %H:%M:%S')
+    #     except ValueError:
+    #         return datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%S.%f").strftime('%Y-%m-%d %H:%M:%S')
+    
     @staticmethod
     def __convert_date_format(date_str):
-        """Convert date string to desired format."""
-        try:
-            return datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%SZ").strftime('%Y-%m-%d %H:%M:%S')
-        except ValueError:
-            return datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%S.%f").strftime('%Y-%m-%d %H:%M:%S')
-    
+        """
+        Convert date string to desired format.
+        Args:
+            date_str (str): The date string to convert.
+        Returns:
+            str: The converted date string in the format '%Y-%m-%d %H:%M:%S'.
+        """
+        if date_str:
+            formats = ["%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%dT%H:%M:%S.%f", "%Y-%m-%d %H:%M:%S"]
+
+            for fmt in formats:
+                try:
+                    return datetime.strptime(date_str, fmt).strftime('%Y-%m-%d %H:%M:%S')
+                except ValueError:
+                    pass
+
+            # Return the original string if no format matches
+        return date_str
+
     def __process_data(self, data):
         """Transform and process the input data for model prediction."""
         transform = transforms.Compose([transforms.Resize(512), transforms.ToTensor()])
@@ -77,13 +103,23 @@ class FullDiskFlarePrediction:
             self.meta['error'] = response.reason
         return True
 
-    def __get_match(self, pattern, content):
+    # def __get_match(self, pattern, content):
+    #     """Helper function to extract pattern matches."""
+    #     match = pattern.search(content)
+    #     if match:
+    #         matched_content = match.group(1)
+    #         # Check if content is bytes and decode if it is
+    #         return matched_content.decode() if isinstance(matched_content, bytes) else matched_content.strip()
+    #     return None
+
+    def __get_match(self, regex_patterns, content):
         """Helper function to extract pattern matches."""
-        match = pattern.search(content)
-        if match:
-            matched_content = match.group(1)
-            # Check if content is bytes and decode if it is
-            return matched_content.decode() if isinstance(matched_content, bytes) else matched_content.strip()
+        for pattern in regex_patterns:
+            match = pattern.search(content)
+            if match:
+                matched_content = match.group(1)
+                # Check if content is bytes and decode if it is
+                return matched_content.decode() if isinstance(matched_content, bytes) else matched_content.strip()
         return None
 
     def __save_hmi(self, response):
@@ -94,7 +130,8 @@ class FullDiskFlarePrediction:
             save_path = os.path.join(folder, self.meta['raw_filename'])
             with open(save_path, 'wb') as f:
                 f.write(response.content)
-            return True
+            return save_path
+            # return True
         return False
 
     def __save_noaa_ar(self, df, filename):
@@ -103,7 +140,8 @@ class FullDiskFlarePrediction:
         os.makedirs(folder, exist_ok=True)
         save_path = os.path.join(folder, filename)
         df.to_csv(save_path, index=False)
-        return True
+        return save_path
+        # return True
 
     def __save_img_array(self, arr, image_type :str = None):
         """Save Image numpy array."""
@@ -112,7 +150,8 @@ class FullDiskFlarePrediction:
             os.makedirs(folder, exist_ok=True)
             save_path = os.path.join(folder, f"{self.meta['local_request_date'].replace('-','_').replace(' ','_').replace(':','_')}")
             np.save(save_path, arr)
-            return True
+            return f"{save_path}.npy"
+            # return True
         return False
 
     def __save_img(self, arr, extension='jpg', image_type:str=None):
@@ -128,31 +167,34 @@ class FullDiskFlarePrediction:
             plt.axis('off')
             fig.tight_layout(pad=0.1)
             fig.savefig(save_path, dpi=300, transparent=True)
-            return True
+            return save_path
+            # return True
         return False
         
-    def __get_data(self):
-        """Fetch and process the data for prediction."""
+    # def __get_data(self):
+    #     """Fetch and process the data for prediction."""
 
-        # Initialize Active Region Extractor
-        extractor = NOAAExtractor()
-        now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
-        final_date = now.replace(" ", "T") + "Z"
+    #     # Initialize Active Region Extractor
+    #     extractor = NOAAExtractor()
+    #     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    #     final_date = now.replace(" ", "T") + "Z"
         
-        # Fetch HMI Magnetogram
-        for uri in [self.__request_uri, self.__mirror_request_uri]:
-            response = requests.get(uri + final_date + self.__uri_encode)
-            if response.ok:
-                self.__input_hmi = self.__process_data(response.content)
-                break
+    #     # Fetch HMI Magnetogram
+    #     for uri in [self.__request_uri, self.__mirror_request_uri]:
+    #         response = requests.get(uri + final_date + self.__uri_encode)
+    #         if response.ok:
+    #             self.__input_hmi = self.__process_data(response.content)
+    #             break
         
-        # Get HMI magentogram metadata
-        self.__extract_img_meta(final_date, response)
-        if self.__save_artefacts == True:
-            self.__save_noaa_ar(extractor.get_noaa_dataframe(), extractor.filename)
-            self.meta['noaa_ar_filename'] = extractor.filename
-            self.__save_hmi(response)
-        return True
+    #     # Get HMI magentogram metadata
+    #     self.__extract_img_meta(final_date, response)
+    #     if self.__save_artefacts == True:
+    #         self.__save_noaa_ar(extractor.get_noaa_dataframe(), extractor.filename)
+    #         self.meta['noaa_ar_filename'] = extractor.filename
+    #         self.__save_hmi(response)
+    #     return True
+
+
 
     def __predict(self):
         """Predict using the model."""
