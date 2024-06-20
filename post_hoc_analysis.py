@@ -16,7 +16,47 @@ def format_img(input_img):
         return input_img.unsqueeze(0)
     return input_img
 
-def guidedgradcam(model, input_img, original_img, target_class):
+
+def attribute_image_features(model, algorithm, input, **kwargs):
+    model.zero_grad()
+    tensor_attributions = algorithm.attribute(input,
+                                              target=1,
+                                              **kwargs
+                               )
+    return tensor_attributions
+    
+
+# def guidedgradcam(model, input_img, original_img, target_class):
+#     """
+#     Applies GuidedGradCam on the given model and image.
+    
+#     Parameters:
+#     - model (torch.nn.Module): Model to apply GuidedGradCam on.
+#     - input_img (torch.Tensor): Input image tensor.
+#     - target_img (torch.Tensor): Target image tensor.
+#     - target_class (int): Target class for attribution.
+    
+#     Returns:
+#     - tuple: Gradient visualizations and the original image.
+#     """
+#     # Ensure the images are correctly formatted
+#     input_img = format_img(input_img)
+#     original_img = format_img(original_img).squeeze(0)
+    
+#     # Enable gradient computation for the input
+#     input_img.requires_grad = True
+    
+#     # Initialize GuidedGradCam and compute the gradients
+#     guided_gc = GuidedGradCam(model, model.features[10])
+#     grads = guided_gc.attribute(input_img, target=target_class)
+    
+#     # Transform the gradients and original image for visualization
+#     grads = np.transpose(grads.squeeze(0).cpu().detach().numpy(), (1, 2, 0))
+#     original_image = np.transpose((original_img.cpu().detach().numpy()), (1, 2, 0))
+#     # original_image = None
+#     return grads,original_image
+
+def guidedgradcam(model, input_img, original_img, target_class, layer=None):
     """
     Applies GuidedGradCam on the given model and image.
     
@@ -25,6 +65,7 @@ def guidedgradcam(model, input_img, original_img, target_class):
     - input_img (torch.Tensor): Input image tensor.
     - target_img (torch.Tensor): Target image tensor.
     - target_class (int): Target class for attribution.
+    - layer (int): Explanation Layer, Last layer before Activation
     
     Returns:
     - tuple: Gradient visualizations and the original image.
@@ -37,6 +78,7 @@ def guidedgradcam(model, input_img, original_img, target_class):
     input_img.requires_grad = True
     
     # Initialize GuidedGradCam and compute the gradients
+    # model.features[layer]
     guided_gc = GuidedGradCam(model, model.features[10])
     grads = guided_gc.attribute(input_img, target=target_class)
     
@@ -45,6 +87,7 @@ def guidedgradcam(model, input_img, original_img, target_class):
     original_image = np.transpose((original_img.cpu().detach().numpy()), (1, 2, 0))
     # original_image = None
     return grads,original_image
+
 
 def get_attention_maps(model, image, flare_probs):
     """
