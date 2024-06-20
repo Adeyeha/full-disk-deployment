@@ -1,6 +1,7 @@
 from captum.attr import GuidedGradCam,IntegratedGradients, DeepLiftShap, Saliency
 import numpy as np
 import cv2 as cv
+import torch
 
 def format_img(input_img):
     """
@@ -89,7 +90,51 @@ def guidedgradcam(model, input_img, original_img, target_class, layer=None):
     return grads,original_image
 
 
-def get_attention_maps(model, image, flare_probs):
+def deepshap(model, input_img, original_img, target_class, modeltype, rgb): 
+
+    # Create a single example of the baseline
+    gray_value = 127
+    if rgb == True:
+        channel = 3
+    else:
+        channel = 1
+    baseline_single = torch.full((10,channel,512, 512), gray_value, dtype=torch.float32)
+
+    # Ensure the images are correctly formatted
+    input_img = format_img(input_img)
+    original_img = format_img(original_img).squeeze(0)
+    
+    # Enable gradient computation for the input
+    input_img.requires_grad = True
+
+    if "resnet" in modeltype.lower():
+        saliency = Saliency(model)
+        grads = saliency.attribute(input_img, target=target_class)
+    else:
+        saliency = DeepLiftShap(model)
+        grads = saliency.attribute(input_img, baselines= baseline_single, target=target_class)
+    grads = np.transpose(grads.squeeze(0).cpu().detach().numpy(), (1, 2, 0))
+    original_image = np.transpose((original_img.cpu().detach().numpy() / 2) + 0.5, (1, 2, 0))
+    return grads
+    
+def intgrad(model, input_img, original_img, target_class):
+
+    # Ensure the images are correctly formatted
+    input_img = format_img(input_img)
+    original_img = format_img(original_img).squeeze(0)
+    
+    # Enable gradient computation for the input
+    input_img.requires_grad = True
+    
+    ig = IntegratedGradients(model)
+    grads, delta = attribute_image_features(model, ig, input_img, baselines=(input_img * 0) + 127, return_convergence_delta=True)
+    grads = np.transpose(grads.squeeze(0).cpu().detach().numpy(), (1, 2, 0))
+    original_image = np.transpose((original_img.cpu().detach().numpy() / 2) + 0.5, (1, 2, 0))
+    # print('Approximation delta: ', abs(delta))
+    return grads
+
+
+def get_attention_maps(model, image, flare_probs, layer, modeltype, rgb):
     """
     Performs post-hoc analysis using GuidedGradCam.
     
@@ -97,6 +142,8 @@ def get_attention_maps(model, image, flare_probs):
     - model (torch.nn.Module): Model for the analysis.
     - image (torch.Tensor): Image tensor for the analysis.
     - flare_probs (float): Flare probability.
+    - layer (int): Explanation Layer, Last layer before Activation
+
     
     Returns:
     - tuple: Gradient visualizations and the original image.
@@ -105,11 +152,39 @@ def get_attention_maps(model, image, flare_probs):
     target_class = 1 #if flare_probs >= 0.5 else 0
     
     # Apply GuidedGradCam
-    guidedgradcam_grads ,original_image = guidedgradcam(model, image, image, target_class)
+    guidedgradcam_grads ,original_image = guidedgradcam(model, image, image, target_class, layer)
+
+    # guidedgradcam_grads ,original_image = ([],[])
+
+    deepshap_grads = deepshap(model, image, image, target_class, modeltype, rgb)
+    # deepshap_grads = []
+
+    intgrad_grads = intgrad(model, image, image, target_class)
     # guidedgradcam_grads = (guidedgradcam_grads - guidedgradcam_grads.min()) / (guidedgradcam_grads.max() - guidedgradcam_grads.min())
 
+    return guidedgradcam_grads,deepshap_grads,intgrad_grads,original_image
+
+# def get_attention_maps(model, image, flare_probs):
+#     """
+#     Performs post-hoc analysis using GuidedGradCam.
     
-    return guidedgradcam_grads,original_image
+#     Parameters:
+#     - model (torch.nn.Module): Model for the analysis.
+#     - image (torch.Tensor): Image tensor for the analysis.
+#     - flare_probs (float): Flare probability.
+    
+#     Returns:
+#     - tuple: Gradient visualizations and the original image.
+#     """
+#     # Determine the target class based on the flare probability
+#     target_class = 1 #if flare_probs >= 0.5 else 0
+    
+#     # Apply GuidedGradCam
+#     guidedgradcam_grads ,original_image = guidedgradcam(model, image, image, target_class)
+#     # guidedgradcam_grads = (guidedgradcam_grads - guidedgradcam_grads.min()) / (guidedgradcam_grads.max() - guidedgradcam_grads.min())
+
+    
+#     return guidedgradcam_grads,original_image
 
 
 def superimpose_original(original_map, attention_map,alpha=0.45):
