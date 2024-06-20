@@ -23,11 +23,12 @@ class FullDiskFlarePrediction:
     Models are trained with PyTorch.
     """
 
-    def __init__(self, modelpath):
+    def __init__(self, modelpath,media_folder):
         self.__modelpath = modelpath
+        self.__media_folder = media_folder
         self.__setup_config()
 
-    def __setup_config(self):
+    def __setup_config(self,):
         """Set up configuration parameters."""
         # self.__obs_date_pattern = re.compile(br'<DATE-OBS>(.*?)</DATE-OBS>')
         # self.__source_date_pattern = re.compile(br'<DATE>(.*?)</DATE>')
@@ -35,7 +36,6 @@ class FullDiskFlarePrediction:
         self.__obs_date_pattern = [re.compile(br'<DATE-OBS>(.*?)</DATE-OBS>'),re.compile(br'<DATE_OBS>(.*?)</DATE_OBS>'),re.compile(br'<DATE_OB>(.*?)</DATE_OB>')]
         self.__source_date_pattern = [re.compile(br'<DATE>(.*?)</DATE>')]
         self.__filename_pattern = [re.compile(r'filename="([^"]+)"')]
-        self.__media_folder = 'media'
         self.__request_uri = 'https://api.helioviewer.org/v2/getJP2Image/?date='
         self.__mirror_request_uri = 'https://helioviewer-api.ias.u-psud.fr//v2/getJP2Image/?date='
         self.__uri_encode = '&sourceId=19'
@@ -56,6 +56,8 @@ class FullDiskFlarePrediction:
         self.__model = None
         self.__include_explain = False
         self.__save_artefacts = False
+        self.__isfilepath = False
+        # self.__generate_explain = False
 
     # @staticmethod
     # def __convert_date_format(date_str):
@@ -86,21 +88,44 @@ class FullDiskFlarePrediction:
             # Return the original string if no format matches
         return date_str
 
+    @staticmethod
+    def __extract_hmi_filename(path):
+        """
+        Extract the filename without the extension from a given path.
+
+        Parameters:
+        path (str): The file path from which to extract the filename.
+
+        Returns:
+        str: The filename without its extension.
+        """
+        # Get the basename from the path
+        base = os.path.basename(path)
+        
+        # Split the basename into name and extension
+        filename_without_extension = os.path.splitext(base)[0]
+        
+        return filename_without_extension
+
     def __process_data(self, data):
         """Transform and process the input data for model prediction."""
         transform = transforms.Compose([transforms.Resize(512), transforms.ToTensor()])
-        hmi = Image.open(BytesIO(data))
+        if self.__isfilepath:
+            hmi = Image.open(data)
+        else:
+            hmi = Image.open(BytesIO(data))
         hmi = transform(hmi).unsqueeze(0)
         return hmi
 
-    def __extract_img_meta(self, local_request_date, response):
+    def __extract_img_meta(self, local_request_date=datetime.now(timezone.utc), response=None):
         """Extract metadata from the image."""
-        self.meta['obs_date'] = self.__convert_date_format(self.__get_match(self.__obs_date_pattern, response.content))
-        self.meta['source_date'] = self.__convert_date_format(self.__get_match(self.__source_date_pattern, response.content))
-        self.meta['raw_filename'] = self.__get_match(self.__filename_pattern, response.headers['Content-Disposition'])
-        self.meta['local_request_date'] = self.__convert_date_format(local_request_date)
-        if not response.ok:
-            self.meta['error'] = response.reason
+        if not self.__isfilepath:
+            self.meta['obs_date'] = self.__convert_date_format(self.__get_match(self.__obs_date_pattern, response.content))
+            self.meta['source_date'] = self.__convert_date_format(self.__get_match(self.__source_date_pattern, response.content))
+            self.meta['raw_filename'] = self.__get_match(self.__filename_pattern, response.headers['Content-Disposition'])
+            self.meta['local_request_date'] = self.__convert_date_format(local_request_date)
+            if not response.ok:
+                self.meta['error'] = response.reason
         return True
 
     # def __get_match(self, pattern, content):
@@ -124,14 +149,15 @@ class FullDiskFlarePrediction:
 
     def __save_hmi(self, response):
         """Save HMI data."""
-        if response.ok:
-            folder = os.path.join(self.__media_folder, "raw", *self.meta['raw_filename'].split('__')[0].split('_'))
-            os.makedirs(folder, exist_ok=True)
-            save_path = os.path.join(folder, self.meta['raw_filename'])
-            with open(save_path, 'wb') as f:
-                f.write(response.content)
-            return save_path
-            # return True
+        if response is not None:
+            if response.ok:
+                folder = os.path.join(self.__media_folder, "raw", *self.meta['raw_filename'].split('__')[0].split('_'))
+                os.makedirs(folder, exist_ok=True)
+                save_path = os.path.join(folder, self.meta['raw_filename'])
+                with open(save_path, 'wb') as f:
+                    f.write(response.content)
+                return save_path
+                # return True
         return False
 
     def __save_noaa_ar(self, df, filename):
@@ -146,9 +172,14 @@ class FullDiskFlarePrediction:
     def __save_img_array(self, arr, image_type :str = None):
         """Save Image numpy array."""
         if arr is not None and image_type is not None:
-            folder = os.path.join(self.__media_folder, image_type, *self.meta['local_request_date'].split(' ')[0].split('-'))
-            os.makedirs(folder, exist_ok=True)
-            save_path = os.path.join(folder, f"{self.meta['local_request_date'].replace('-','_').replace(' ','_').replace(':','_')}")
+            if not self.__isfilepath:
+                folder = os.path.join(self.__media_folder, image_type, *self.meta['local_request_date'].split(' ')[0].split('-'))
+                os.makedirs(folder, exist_ok=True)
+                save_path = os.path.join(folder, f"{self.meta['local_request_date'].replace('-','_').replace(' ','_').replace(':','_')}")
+            else:
+                folder = os.path.join(self.__media_folder, image_type)
+                os.makedirs(folder, exist_ok=True)
+                save_path = os.path.join(folder, self.__hmi_filename)
             np.save(save_path, arr)
             return f"{save_path}.npy"
             # return True
@@ -157,9 +188,16 @@ class FullDiskFlarePrediction:
     def __save_img(self, arr, extension='jpg', image_type:str=None):
         """Save JPG Image"""
         if arr is not None and image_type is not None:
-            folder = os.path.join(self.__media_folder, image_type, *self.meta['local_request_date'].split(' ')[0].split('-'))
-            os.makedirs(folder, exist_ok=True)
-            save_path = os.path.join(folder, f"{self.meta['local_request_date'].replace('-','_').replace(' ','_').replace(':','_')}.{extension}")
+            if not self.__isfilepath:
+
+                folder = os.path.join(self.__media_folder, image_type, *self.meta['local_request_date'].split(' ')[0].split('-'))
+                os.makedirs(folder, exist_ok=True)
+                save_path = os.path.join(folder, f"{self.meta['local_request_date'].replace('-','_').replace(' ','_').replace(':','_')}.{extension}")
+
+            else:
+                folder = os.path.join(self.__media_folder, image_type)
+                os.makedirs(folder, exist_ok=True)
+                save_path = os.path.join(folder, self.__hmi_filename)
 
             #plot overlayed image
             fig, ax = plt.subplots()
@@ -194,26 +232,33 @@ class FullDiskFlarePrediction:
     #         self.__save_hmi(response)
     #     return True
 
-    def __get_data(self,date_=datetime.now(timezone.utc)):
+    def __get_data(self,date_=datetime.now(timezone.utc), path=None):
         """Fetch and process the data for prediction."""
 
         # Initialize Active Region Extractor
         extractor = NOAAExtractor()
         date_format = os.getenv("date_format")
-        if isinstance(date_,str):
-            date_ = datetime.strptime(date_,date_format)
-        date_ = date_.strftime(date_format)
-        final_date = date_.replace(" ", "T") + "Z"
-        
-        # Fetch HMI Magnetogram
-        for uri in [self.__request_uri, self.__mirror_request_uri]:
-            response = requests.get(uri + final_date + self.__uri_encode)
-            if response.ok:
-                self.__input_hmi = self.__process_data(response.content)
-                break
-        
+
+        if not self.__isfilepath:
+            if isinstance(date_,str):
+                date_ = datetime.strptime(date_,date_format)
+            date_ = date_.strftime(date_format)
+            final_date = date_.replace(" ", "T") + "Z"
+            
+            # Fetch HMI Magnetogram
+            for uri in [self.__request_uri, self.__mirror_request_uri]:
+                response = requests.get(uri + final_date + self.__uri_encode)
+                if response.ok:
+                    self.__input_hmi = self.__process_data(response.content)
+                    break
+
+            self.__extract_img_meta(final_date, response)
+
+        else:
+            self.__input_hmi = self.__process_data(path)
+            response=None
+
         # Get HMI magentogram metadata
-        self.__extract_img_meta(final_date, response)
         if self.__save_artefacts == True:
             noaa_ar_save_path = self.__save_noaa_ar(extractor.get_noaa_dataframe(), extractor.filename)
             self.meta['noaa_ar_filename'] = extractor.filename
@@ -244,10 +289,10 @@ class FullDiskFlarePrediction:
     #     return True
 
 
-    def __predict(self,date_=datetime.now(timezone.utc)):
+    def __predict(self,date_=datetime.now(timezone.utc),path=None):
         """Predict using the model."""
         try:
-            self.__get_data(date_)
+            self.__get_data(date_,path)
             if self.__input_hmi is not None:
                 device = torch.device('cpu')
                 self.__model = Custom_AlexNet().to(device)
@@ -300,7 +345,6 @@ class FullDiskFlarePrediction:
             intgrad_save_path = self.__save_img_array(intgrad, "intgrad")
             original_save_path = self.__save_img_array(original, "original")
             # self.__save_img(superimpose_original(original,guidedgradcam),image_type="superimposed")
-
             self.meta['artefacts'].update({
                 'original':original_save_path,
                 'deepshap':deepshap_save_path,
@@ -319,12 +363,20 @@ class FullDiskFlarePrediction:
         return True
 
     # def predict(self,include_explain=True,save_artefacts=False):
-    def predict(self,date_=datetime.now(timezone.utc),include_explain=True,save_artefacts=False,explanation_layer=None):
+    def predict(self, path=None, date_=datetime.now(timezone.utc), generate_explain=True, include_explain=True,save_artefacts=False,explanation_layer=None):
         """Predict using the model.""" 
-        self.__include_explain = include_explain
+        if path:
+            self.__isfilepath = True
+            self.__hmi_filename = self.__extract_hmi_filename(path)
+        if include_explain:
+            # self.__generate_explain = True
+            self.__include_explain = include_explain
         self.__save_artefacts = save_artefacts
-        self.__predict(date_)
-        self.__explain(None)
+        self.__predict(date_,path)
+        if generate_explain:
+            self.__explain(None)
         # self.__explain()
         # self.input_hmi = np.transpose(self.__input_hmi.detach().numpy().squeeze(0), (1, 2, 0))
         return self.meta
+
+    

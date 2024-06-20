@@ -141,3 +141,4 @@ media/
 trained-models/
 old/
 settings.py
+alexnet/*
