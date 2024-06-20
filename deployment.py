@@ -194,7 +194,35 @@ class FullDiskFlarePrediction:
     #         self.__save_hmi(response)
     #     return True
 
+    def __get_data(self,date_=datetime.now(timezone.utc)):
+        """Fetch and process the data for prediction."""
 
+        # Initialize Active Region Extractor
+        extractor = NOAAExtractor()
+        date_format = os.getenv("date_format")
+        if isinstance(date_,str):
+            date_ = datetime.strptime(date_,date_format)
+        date_ = date_.strftime(date_format)
+        final_date = date_.replace(" ", "T") + "Z"
+        
+        # Fetch HMI Magnetogram
+        for uri in [self.__request_uri, self.__mirror_request_uri]:
+            response = requests.get(uri + final_date + self.__uri_encode)
+            if response.ok:
+                self.__input_hmi = self.__process_data(response.content)
+                break
+        
+        # Get HMI magentogram metadata
+        self.__extract_img_meta(final_date, response)
+        if self.__save_artefacts == True:
+            noaa_ar_save_path = self.__save_noaa_ar(extractor.get_noaa_dataframe(), extractor.filename)
+            self.meta['noaa_ar_filename'] = extractor.filename
+            magnetogram_save_path = self.__save_hmi(response)
+            self.meta['artefacts'].update({
+                "magnetogram":magnetogram_save_path,
+                "noaa_ar":noaa_ar_save_path
+                })
+        return True
 
     def __predict(self):
         """Predict using the model."""
