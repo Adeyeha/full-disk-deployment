@@ -154,13 +154,11 @@ def get_attention_maps(model, image, flare_probs, layer, modeltype, rgb):
     # Apply GuidedGradCam
     guidedgradcam_grads ,original_image = guidedgradcam(model, image, image, target_class, layer)
 
-    # guidedgradcam_grads ,original_image = ([],[])
-
     deepshap_grads = deepshap(model, image, image, target_class, modeltype, rgb)
     # deepshap_grads = []
 
     intgrad_grads = intgrad(model, image, image, target_class)
-    # guidedgradcam_grads = (guidedgradcam_grads - guidedgradcam_grads.min()) / (guidedgradcam_grads.max() - guidedgradcam_grads.min())
+    # intgrad_grads = []
 
     return guidedgradcam_grads,deepshap_grads,intgrad_grads,original_image
 
