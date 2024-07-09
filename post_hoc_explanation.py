@@ -1,5 +1,6 @@
 # Library Imports
 
+from decimal import DivisionByZero
 import pandas as pd
 # pd.set_option('display.max_columns', None)
 import numpy as np
@@ -403,7 +404,10 @@ def collocation_ratio(distances):
     :param distances: The distance between each flare and the closest hull
     :return: The collocation ratio
     """
-    collocation_ratio = round(len([d for d in distances if d[2] == 0]) / len(distances),2)
+    try:
+        collocation_ratio = round(len([d for d in distances if d[2] == 0]) / len(distances),2)
+    except ZeroDivisionError:
+        return 0
     return collocation_ratio
 
 

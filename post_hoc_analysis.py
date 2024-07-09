@@ -154,11 +154,11 @@ def get_attention_maps(model, image, flare_probs, layer, modeltype, rgb):
     # Apply GuidedGradCam
     guidedgradcam_grads ,original_image = guidedgradcam(model, image, image, target_class, layer)
 
-    deepshap_grads = deepshap(model, image, image, target_class, modeltype, rgb)
-    # deepshap_grads = []
+    # deepshap_grads = deepshap(model, image, image, target_class, modeltype, rgb)
+    deepshap_grads = []
 
-    intgrad_grads = intgrad(model, image, image, target_class)
-    # intgrad_grads = []
+    # intgrad_grads = intgrad(model, image, image, target_class)
+    intgrad_grads = []
 
     return guidedgradcam_grads,deepshap_grads,intgrad_grads,original_image
 
@@ -285,6 +285,17 @@ def superimpose_circular_edge_npy(npy_path_original, background_image):
     
     # Draw the circular edge in white on the superimposed image
     cv2.drawContours(superimposed_image, [largest_contour], -1, (255), thickness=1)
+
+    # contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    # # Find the largest contour
+    # largest_contour = max(contours, key=cv2.contourArea)
+
+    # Fit a minimum enclosing circle around the largest contour
+    (x, y), radius = cv2.minEnclosingCircle(largest_contour)
+
+    # Print the radius
+    print("Radius of the circular mask:", radius)
         
     return superimposed_image
 

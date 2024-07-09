@@ -142,3 +142,4 @@ trained-models/
 old/
 settings.py
 alexnet/*
+alexnet1/*

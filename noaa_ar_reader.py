@@ -87,15 +87,21 @@ class NOAAExtractor:
 
         return all_noaa_ars
 
-    def fetch_data(self):
+    def fetch_data(self,path=None):
         """Fetch content from NOAA."""
-        with urllib.request.urlopen(self.url) as fp:
-            content = fp.read().decode('utf-8')
-        return content
+        if not path:
+            with urllib.request.urlopen(self.url) as fp:
+                content = fp.read().decode('utf-8')
+            return content
 
-    def get_noaa_dataframe(self):
+        with open(path, 'r') as file:
+            # Read the content of the file
+            content = file.read()
+            return content
+
+    def get_noaa_dataframe(self,path=None):
         """Return the NOAA DataFrame."""
-        content = self.fetch_data()
+        content = self.fetch_data(path)
         noaa_ars_data = self.extract_active_regions_from_text(content)
         columns = ['year', 'month', 'day', 'noaa_ar_no', 'longitude', 'latitude', 'carrington_longitude',
                    'corr_whole_spot_area', 'mcintosh', 'LL', 'number_of_spots', 'greenwich']

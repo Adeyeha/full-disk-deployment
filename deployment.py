@@ -237,7 +237,7 @@ class FullDiskFlarePrediction:
 
         # Initialize Active Region Extractor
         extractor = NOAAExtractor()
-        date_format = os.getenv("date_format")
+        date_format =  "%Y-%m-%d %H:%M:%S" #os.getenv("date_format")
 
         if not self.__isfilepath:
             if isinstance(date_,str):
