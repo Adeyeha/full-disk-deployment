@@ -143,3 +143,4 @@ old/
 settings.py
 alexnet/*
 alexnet1/*
+menv/*

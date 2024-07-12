@@ -16,3 +16,4 @@ uvicorn
 python-multipart
 python-dotenv
 gunicorn
+seaborn

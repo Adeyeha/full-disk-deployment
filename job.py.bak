@@ -1,0 +1,33 @@
+from deployment import FullDiskFlarePrediction
+import time
+import pandas as pd
+import warnings
+warnings.filterwarnings('ignore')
+
+def write_to_csv(result, csv_filename='results.csv'):
+    """
+    Append the result to the specified CSV file. If the file doesn't exist, it creates one.
+    
+    Parameters:
+    - result (dict): The dictionary containing the result.
+    - csv_filename (str): Name of the CSV file to append to or create.
+    """
+    # Convert the result dictionary to a DataFrame
+    df = pd.DataFrame([result])
+    
+    # Append the result to the CSV (or create it if it doesn't exist)
+    with open(csv_filename, 'a') as file:
+        df.to_csv(file, header=(not file.tell()), index=False)
+
+def main():
+    #Issuing prediction for M1+ Flares
+    PATH1 = 'trained-models/full-disk-Mclass.pth'
+    fdp = FullDiskFlarePrediction(PATH1)
+
+    try:
+        write_to_csv(fdp.predict(save_artefacts=True,include_explain=False))
+    except Exception as e:
+        print(str(e))
+
+if __name__ == "__main__":
+    main()
