@@ -358,18 +358,33 @@ class FullDiskFlarePrediction:
     #     return True
 
 
-    def __predict(self,date_=datetime.now(timezone.utc),path=None):
+    # def __predict(self,date_=datetime.now(timezone.utc),path=None):
+    #     """Predict using the model."""
+    #     try:
+    #         self.__get_data(date_,path)
+    #         if self.__input_hmi is not None:
+    #             device = torch.device('cpu')
+    #             self.__model = Custom_AlexNet().to(device)
+    #             checkpoint = torch.load(self.__modelpath, map_location=device)
+    #             self.__model.load_state_dict(checkpoint['model_state_dict'])
+    #             self.__model.eval()
+    #             with torch.no_grad():
+    #                 out = self.__model(self.__input_hmi)
+    #                 noflare_prob,flare_prob = out[0].detach().numpy()
+    #                 self.meta['flare_probability'], self.meta['non_flare_probability'] = flare_prob, noflare_prob
+    #     except Exception as e:
+    #         self.meta['error'] = str(e)
+    #         raise
+    #     return True
+    
+    # from decouple
+    def __predict(self,date_=datetime.now(timezone.utc)):
         """Predict using the model."""
         try:
-            self.__get_data(date_,path)
+            self.__get_data(date_)
             if self.__input_hmi is not None:
-                device = torch.device('cpu')
-                self.__model = Custom_AlexNet().to(device)
-                checkpoint = torch.load(self.__modelpath, map_location=device)
-                self.__model.load_state_dict(checkpoint['model_state_dict'])
-                self.__model.eval()
                 with torch.no_grad():
-                    out = self.__model(self.__input_hmi)
+                    out = self.model(self.__input_hmi)
                     noflare_prob,flare_prob = out[0].detach().numpy()
                     self.meta['flare_probability'], self.meta['non_flare_probability'] = flare_prob, noflare_prob
         except Exception as e:
@@ -402,11 +417,40 @@ class FullDiskFlarePrediction:
 
     #     return True
 
+    # def __explain(self,explanation_layer):
+
+    #     """Run explanation function"""
+    #     # guidedgradcam,deepshap,intgrad,original = get_attention_maps(self.model,self.__input_hmi,self.meta['flare_probability'], explanation_layer, self.modeltype, self.__rgb)
+    #     guidedgradcam,deepshap,intgrad,original = get_attention_maps(self.__model,self.__input_hmi,self.meta['flare_probability'], explanation_layer, 'Alexnet', False)
+
+    #     if self.__save_artefacts == True:
+    #         guidedgradcam_save_path = self.__save_img_array(guidedgradcam, "guidedgradcam")
+    #         deepshap_save_path = self.__save_img_array(deepshap, "deepshap")
+    #         intgrad_save_path = self.__save_img_array(intgrad, "intgrad")
+    #         original_save_path = self.__save_img_array(original, "original")
+    #         # self.__save_img(superimpose_original(original,guidedgradcam),image_type="superimposed")
+    #         self.meta['artefacts'].update({
+    #             'original':original_save_path,
+    #             'deepshap':deepshap_save_path,
+    #             'intgrad':intgrad_save_path,
+    #             'guidedgradcam':guidedgradcam_save_path,
+    #         })
+
+    #     if self.__include_explain == True:
+    #         self.meta['explanation'] = {
+    #             'original':original,
+    #             'deepshap':deepshap,
+    #             'intgrad':intgrad,
+    #             'guidedgradcam':guidedgradcam,
+    #         }
+
+    #     return True
+
+    # from decouple
     def __explain(self,explanation_layer):
 
         """Run explanation function"""
-        # guidedgradcam,deepshap,intgrad,original = get_attention_maps(self.model,self.__input_hmi,self.meta['flare_probability'], explanation_layer, self.modeltype, self.__rgb)
-        guidedgradcam,deepshap,intgrad,original = get_attention_maps(self.__model,self.__input_hmi,self.meta['flare_probability'], explanation_layer, 'Alexnet', False)
+        guidedgradcam,deepshap,intgrad,original = get_attention_maps(self.model,self.__input_hmi,self.meta['flare_probability'], explanation_layer, self.modeltype, self.__rgb)
 
         if self.__save_artefacts == True:
             guidedgradcam_save_path = self.__save_img_array(guidedgradcam, "guidedgradcam")
@@ -414,6 +458,7 @@ class FullDiskFlarePrediction:
             intgrad_save_path = self.__save_img_array(intgrad, "intgrad")
             original_save_path = self.__save_img_array(original, "original")
             # self.__save_img(superimpose_original(original,guidedgradcam),image_type="superimposed")
+
             self.meta['artefacts'].update({
                 'original':original_save_path,
                 'deepshap':deepshap_save_path,
@@ -431,21 +476,41 @@ class FullDiskFlarePrediction:
 
         return True
 
-    # def predict(self,include_explain=True,save_artefacts=False):
+    # # def predict(self,include_explain=True,save_artefacts=False):
+    # def predict(self, path=None, date_=datetime.now(timezone.utc), generate_explain=True, include_explain=True,save_artefacts=False,explanation_layer=None):
+    #     """Predict using the model.""" 
+    #     if path:
+    #         self.__isfilepath = True
+    #         self.__hmi_filename = self.__extract_hmi_filename(path)
+    #     if include_explain:
+    #         # self.__generate_explain = True
+    #         self.__include_explain = include_explain
+    #     self.__save_artefacts = save_artefacts
+    #     self.__predict(date_,path)
+    #     if generate_explain:
+    #         self.__explain(None)
+    #     # self.__explain()
+    #     # self.input_hmi = np.transpose(self.__input_hmi.detach().numpy().squeeze(0), (1, 2, 0))
+    #     return self.meta
+
+
+    # from decouple
     def predict(self, path=None, date_=datetime.now(timezone.utc), generate_explain=True, include_explain=True,save_artefacts=False,explanation_layer=None):
+
         """Predict using the model.""" 
         if path:
             self.__isfilepath = True
             self.__hmi_filename = self.__extract_hmi_filename(path)
         if include_explain:
-            # self.__generate_explain = True
             self.__include_explain = include_explain
         self.__save_artefacts = save_artefacts
-        self.__predict(date_,path)
+        self.__predict(date_)
         if generate_explain:
-            self.__explain(None)
-        # self.__explain()
+            self.__explain(explanation_layer)
         # self.input_hmi = np.transpose(self.__input_hmi.detach().numpy().squeeze(0), (1, 2, 0))
         return self.meta
 
-    
+
+
+
+
