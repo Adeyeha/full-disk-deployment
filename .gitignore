@@ -141,3 +141,7 @@ media/
 trained-models/
 old/
 settings.py
+menv/*
+env/*
+alexnet/*
+alexnet1/*
