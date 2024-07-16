@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import torch
 # from model.model import Custom_AlexNet
-from model.model import NET_TYPES,Custom_AlexNet,VGG16
+from model.model import NET_TYPES,Custom_AlexNet,VGG16,Custom_VGG16
 
 import torchvision.transforms as transforms 
 from PIL import Image
@@ -118,9 +118,9 @@ class FullDiskFlarePrediction:
         #     device = torch.device('cpu')
         #     self.model = Custom_ResNet34().to(device)
 
-        # elif self.modeltype.lower() == "customvgg16":
-        #     device = torch.device('cpu')
-        #     self.model = Custom_VGG16().to(device)
+        elif self.modeltype.lower() == "customvgg16":
+            device = torch.device('cpu')
+            self.model = Custom_VGG16().to(device)
 
         elif self.modeltype.lower() == "vgg16":
             device = torch.device('cpu')

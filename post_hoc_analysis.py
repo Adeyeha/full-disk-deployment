@@ -80,7 +80,7 @@ def guidedgradcam(model, input_img, original_img, target_class, layer=None):
     
     # Initialize GuidedGradCam and compute the gradients
     # model.features[layer]
-    guided_gc = GuidedGradCam(model, model.features[10])
+    guided_gc = GuidedGradCam(model,layer)
     grads = guided_gc.attribute(input_img, target=target_class)
     
     # Transform the gradients and original image for visualization
