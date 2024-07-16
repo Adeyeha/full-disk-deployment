@@ -28,7 +28,7 @@ class FullDiskFlarePrediction:
     def __init__(self, modeltype, modelpath, media_folder, rgb=False):
         self.__modelpath = modelpath
         self.__media_folder = media_folder
-        self.__rgb = True
+        self.__rgb = rgb
         self.__setup_config(modeltype)
         self.__model_config()
 
@@ -183,11 +183,19 @@ class FullDiskFlarePrediction:
         """Transform and process the input data for model prediction."""
         transform = transforms.Compose([transforms.Resize(512), transforms.ToTensor()])
         if self.__isfilepath:
-            hmi = Image.open(data)
+            if self.__rgb == True:
+                hmi = Image.open(data).convert('RGB')
+            else:
+                hmi = Image.open(data)
+
         else:
-            hmi = Image.open(BytesIO(data))
+            if self.__rgb == True:
+                hmi = Image.open(BytesIO(data)).convert('RGB')
+            else:
+                hmi = Image.open(BytesIO(data))
         hmi = transform(hmi).unsqueeze(0)
         return hmi
+
 
     def __extract_img_meta(self, local_request_date=datetime.now(timezone.utc), response=None):
         """Extract metadata from the image."""
