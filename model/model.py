@@ -6,7 +6,14 @@ from torch.autograd import Variable
 from torchvision.transforms import ToTensor
 
 
-NET_TYPES = {'alexnet': torchvision.models.alexnet}
+# NET_TYPES = {'alexnet': torchvision.models.alexnet}
+NET_TYPES = {
+             'alexnet': torchvision.models.alexnet,
+             'customvgg16' : torchvision.models.vgg16,
+             'customresnet34': torchvision.models.resnet34,
+             'vgg16': None
+             
+}
 
 class Custom_AlexNet(nn.Module):
 
