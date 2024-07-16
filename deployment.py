@@ -23,22 +23,40 @@ class FullDiskFlarePrediction:
     Models are trained with PyTorch.
     """
 
-    def __init__(self, modelpath,media_folder):
+    def __init__(self, modeltype, modelpath, media_folder, rgb=False):
         self.__modelpath = modelpath
         self.__media_folder = media_folder
-        self.__setup_config()
+        self.__rgb = True
+        self.__setup_config(modeltype)
+        self.__model_config()
 
-    def __setup_config(self,):
+    # def __init__(self, modelpath,media_folder):
+    #     self.__modelpath = modelpath
+    #     self.__media_folder = media_folder
+    #     self.__setup_config()
+
+    def __checkmodel(self,modeltype):
+        """
+        Check if the model is valid.
+
+        Raises:
+        - ValueError: If the modeltype is not one of the valid models.
+        """
+        if modeltype not in NET_TYPES.keys():
+            raise ValueError(f"parameter `modeltype` must be one of {' or '.join(NET_TYPES.keys())}")
+        return True
+
+
+    def __setup_config(self,modeltype):
         """Set up configuration parameters."""
-        # self.__obs_date_pattern = re.compile(br'<DATE-OBS>(.*?)</DATE-OBS>')
-        # self.__source_date_pattern = re.compile(br'<DATE>(.*?)</DATE>')
-        # self.__filename_pattern = re.compile(r'filename="([^"]+)"')
         self.__obs_date_pattern = [re.compile(br'<DATE-OBS>(.*?)</DATE-OBS>'),re.compile(br'<DATE_OBS>(.*?)</DATE_OBS>'),re.compile(br'<DATE_OB>(.*?)</DATE_OB>')]
         self.__source_date_pattern = [re.compile(br'<DATE>(.*?)</DATE>')]
         self.__filename_pattern = [re.compile(r'filename="([^"]+)"')]
+        self.__media_folder = 'media'
         self.__request_uri = 'https://api.helioviewer.org/v2/getJP2Image/?date='
         self.__mirror_request_uri = 'https://helioviewer-api.ias.u-psud.fr//v2/getJP2Image/?date='
         self.__uri_encode = '&sourceId=19'
+        self.modeltype = modeltype if self.__checkmodel(modeltype) else None
         self.meta = {
             'source_date': None, 
             'obs_date': None, 
@@ -50,14 +68,65 @@ class FullDiskFlarePrediction:
             'non_flare_probability': None,
             'explanation': None,
             'artefacts' : dict()
-
         }
         self.__input_hmi = None
-        self.__model = None
+        self.model = None
         self.__include_explain = False
         self.__save_artefacts = False
         self.__isfilepath = False
-        # self.__generate_explain = False
+
+    # def __setup_config(self,):
+    #     """Set up configuration parameters."""
+    #     # self.__obs_date_pattern = re.compile(br'<DATE-OBS>(.*?)</DATE-OBS>')
+    #     # self.__source_date_pattern = re.compile(br'<DATE>(.*?)</DATE>')
+    #     # self.__filename_pattern = re.compile(r'filename="([^"]+)"')
+    #     self.__obs_date_pattern = [re.compile(br'<DATE-OBS>(.*?)</DATE-OBS>'),re.compile(br'<DATE_OBS>(.*?)</DATE_OBS>'),re.compile(br'<DATE_OB>(.*?)</DATE_OB>')]
+    #     self.__source_date_pattern = [re.compile(br'<DATE>(.*?)</DATE>')]
+    #     self.__filename_pattern = [re.compile(r'filename="([^"]+)"')]
+    #     self.__request_uri = 'https://api.helioviewer.org/v2/getJP2Image/?date='
+    #     self.__mirror_request_uri = 'https://helioviewer-api.ias.u-psud.fr//v2/getJP2Image/?date='
+    #     self.__uri_encode = '&sourceId=19'
+    #     self.meta = {
+    #         'source_date': None, 
+    #         'obs_date': None, 
+    #         'raw_filename': None, 
+    #         'noaa_ar_filename': None,
+    #         'local_request_date': None,
+    #         'error': None,
+    #         'flare_probability': None,
+    #         'non_flare_probability': None,
+    #         'explanation': None,
+    #         'artefacts' : dict()
+
+    #     }
+    #     self.__input_hmi = None
+    #     self.__model = None
+    #     self.__include_explain = False
+    #     self.__save_artefacts = False
+    #     self.__isfilepath = False
+    #     # self.__generate_explain = False
+
+    def __model_config(self):
+        """Configure the model"""
+        if self.modeltype.lower() == "customalexnet":
+            device = torch.device('cpu')
+            self.model = Custom_AlexNet().to(device)
+
+        elif self.modeltype.lower() == "customresnet34":
+            device = torch.device('cpu')
+            self.model = Custom_ResNet34().to(device)
+
+        elif self.modeltype.lower() == "customvgg16":
+            device = torch.device('cpu')
+            self.model = Custom_VGG16().to(device)
+
+        elif self.modeltype.lower() == "vgg16":
+            device = torch.device('cpu')
+            self.model = VGG16().to(device)
+
+        checkpoint = torch.load(self.__modelpath, map_location=device)
+        self.model.load_state_dict(checkpoint['model_state_dict'])
+        self.model.eval()
 
     # @staticmethod
     # def __convert_date_format(date_str):
