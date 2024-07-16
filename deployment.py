@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import torch
 # from model.model import Custom_AlexNet
-from model.model import NET_TYPES,Custom_AlexNet,Custom_ResNet34,Custom_VGG16,VGG16
+from model.model import NET_TYPES,Custom_AlexNet,VGG16
 
 import torchvision.transforms as transforms 
 from PIL import Image
@@ -54,7 +54,7 @@ class FullDiskFlarePrediction:
         self.__obs_date_pattern = [re.compile(br'<DATE-OBS>(.*?)</DATE-OBS>'),re.compile(br'<DATE_OBS>(.*?)</DATE_OBS>'),re.compile(br'<DATE_OB>(.*?)</DATE_OB>')]
         self.__source_date_pattern = [re.compile(br'<DATE>(.*?)</DATE>')]
         self.__filename_pattern = [re.compile(r'filename="([^"]+)"')]
-        self.__media_folder = 'media'
+        # self.__media_folder = 'media'
         self.__request_uri = 'https://api.helioviewer.org/v2/getJP2Image/?date='
         self.__mirror_request_uri = 'https://helioviewer-api.ias.u-psud.fr//v2/getJP2Image/?date='
         self.__uri_encode = '&sourceId=19'
@@ -114,13 +114,13 @@ class FullDiskFlarePrediction:
             device = torch.device('cpu')
             self.model = Custom_AlexNet().to(device)
 
-        elif self.modeltype.lower() == "customresnet34":
-            device = torch.device('cpu')
-            self.model = Custom_ResNet34().to(device)
+        # elif self.modeltype.lower() == "customresnet34":
+        #     device = torch.device('cpu')
+        #     self.model = Custom_ResNet34().to(device)
 
-        elif self.modeltype.lower() == "customvgg16":
-            device = torch.device('cpu')
-            self.model = Custom_VGG16().to(device)
+        # elif self.modeltype.lower() == "customvgg16":
+        #     device = torch.device('cpu')
+        #     self.model = Custom_VGG16().to(device)
 
         elif self.modeltype.lower() == "vgg16":
             device = torch.device('cpu')
@@ -179,6 +179,7 @@ class FullDiskFlarePrediction:
         return filename_without_extension
 
     def __process_data(self, data):
+        print(data)
         """Transform and process the input data for model prediction."""
         transform = transforms.Compose([transforms.Resize(512), transforms.ToTensor()])
         if self.__isfilepath:
@@ -380,10 +381,10 @@ class FullDiskFlarePrediction:
     #     return True
     
     # from decouple
-    def __predict(self,date_=datetime.now(timezone.utc)):
+    def __predict(self,date_=datetime.now(timezone.utc),path=None):
         """Predict using the model."""
         try:
-            self.__get_data(date_)
+            self.__get_data(date_,path)
             if self.__input_hmi is not None:
                 with torch.no_grad():
                     out = self.model(self.__input_hmi)
@@ -506,7 +507,7 @@ class FullDiskFlarePrediction:
         if include_explain:
             self.__include_explain = include_explain
         self.__save_artefacts = save_artefacts
-        self.__predict(date_)
+        self.__predict(date_,path)
         if generate_explain:
             self.__explain(explanation_layer)
         # self.input_hmi = np.transpose(self.__input_hmi.detach().numpy().squeeze(0), (1, 2, 0))

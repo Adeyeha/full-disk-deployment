@@ -148,11 +148,12 @@ def main():
 
             # Find the row with the specific timestamp in the DataFrame
             row = db.loc[db['obs_date'] == selected_date].sort_values('local_request_date',ascending=False).head(1)
-            guidedgradcam = retrieve_npy(row['local_request_date'].values[0],root='guidedgradcam')
-            original = retrieve_npy(row['local_request_date'].values[0],root='original')
+            guidedgradcam = retrieve_npy(row['local_request_date'].values[0],media='media',root='guidedgradcam')
+            original = retrieve_npy(row['local_request_date'].values[0],media='media',root='original')
             ar_names,ar_lat,ar_lon = retrieve_ar(row['local_request_date'].values[0],
             plage=plage ,
-            events=events
+            events=events,
+            media='media'
 
             )
 
