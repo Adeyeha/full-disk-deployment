@@ -1,7 +1,9 @@
 import pandas as pd
 import numpy as np
 import torch
-from model.model import Custom_AlexNet
+# from model.model import Custom_AlexNet
+from model.model import NET_TYPES,Custom_AlexNet,Custom_ResNet34,Custom_VGG16,VGG16
+
 import torchvision.transforms as transforms 
 from PIL import Image
 from datetime import datetime, timezone
