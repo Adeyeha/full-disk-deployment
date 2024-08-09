@@ -2,12 +2,12 @@ import pandas as pd
 from deployment import FullDiskFlarePrediction
 import os
 #Issuing prediction for M1+ Flares
-PATH1 = 'trained-models/alexnet-fold1.pth'
-fdp = FullDiskFlarePrediction(PATH1,media_folder='media')
+PATH1 = 'trained-models/vgg-fold1.pth'
+fdp = FullDiskFlarePrediction(modelpath=PATH1,media_folder='vgg',modeltype='vgg16',rgb=True)
 data = pd.read_csv('pred_dates.csv')
 
 # Assuming 'data' is your DataFrame and 'fdp' is your predictor object
-output_file = 'predictions.txt'
+output_file = 'predictions_vgg.txt'
 headers = ["source_date","obs_date","raw_filename","noaa_ar_filename","local_request_date","error","flare_probability","non_flare_probability","explanation"]
 
 # Check if the file exists and is not empty, if not, write the headers
@@ -25,7 +25,9 @@ with open(output_file, 'a') as file:
             # path=r'E:\Comcast\Desktop\full-disk-deployment\media\raw\2014\01\06\2014_01_06__18_59_39_10__SDO_HMI_HMI_magnetogram.jp2',
             save_artefacts=True,
             generate_explain=True,
-            include_explain=False
+            include_explain=False,
+            explanation_layer=fdp.model.features[28]
+
         )
 
         # Extract relevant prediction details

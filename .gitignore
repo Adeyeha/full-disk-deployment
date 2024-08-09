@@ -145,3 +145,4 @@ alexnet/*
 alexnet1/*
 menv/*
 vgg/*
+resnet/*

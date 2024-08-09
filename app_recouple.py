@@ -93,7 +93,7 @@ def main():
 
     st.sidebar.title("Flare Information")
 
-    db_file = "predictions.txt"
+    db_file = "predictions_resnet.txt"
     db = pd.read_csv(db_file)
 
     # selected_date = st.sidebar.date_input("Past Predictions Date").strftime("%Y-%m-%d")
@@ -146,6 +146,8 @@ def main():
             nw_angle = -angle
             sw_angle =  angle
 
+
+            # Include tab here
             # Find the row with the specific timestamp in the DataFrame
             row = db.loc[db['obs_date'] == selected_date].sort_values('local_request_date',ascending=False).head(1)
             guidedgradcam = retrieve_npy(row['local_request_date'].values[0],media='media',root='guidedgradcam')
@@ -169,7 +171,7 @@ def main():
             # Analyze attention map
             bounding_hulls_img, distances_df, score, ratio = post_hoc_explanation.explain(guidedgradcam, flares, nw_angle, sw_angle, es_buffer, ws_buffer,lower_threshold,upper_threshold,min_samples,distance_threshold, numpy=True)
 
-            print(nw_angle, sw_angle, es_buffer, ws_buffer,lower_threshold,upper_threshold,min_samples,distance_threshold)
+            # print(nw_angle, sw_angle, es_buffer, ws_buffer,lower_threshold,upper_threshold,min_samples,distance_threshold)
 
             col1, col2 = st.columns(2)
             col1.image(np.load(original), caption=f"Input Magnetogram @ {selected_date}UTC", use_column_width=True)
@@ -196,7 +198,7 @@ def main():
             col1.markdown(f'<span style="color: blue; font-size: larger;"><b>Flare Probability (≥ M1.0) = {round((row["flare_probability"].values[0] * 100), 2)}%</b></span>', unsafe_allow_html=True)
             col1.write(f"Proximity Score = {score}")
             col1.write(f"Collocation Ratio = {round(ratio,2) * 100}%")
-            if actual_pred.shape[0] > 1:
+            if actual_pred.shape[0] >= 1:
                 col1.write(f"Actual = Flare")
             else:
                 col1.write(f"Actual = Non Flare")            

@@ -192,6 +192,7 @@ def superimpose_original(original_map, attention_map,alpha=0.45):
     # Load the 1-channel images from .npy files
     original_map = original_map.astype(int).squeeze()  # Squeeze the last dimension
     attention_map = attention_map.squeeze()
+    # print(f"shapes: {original_map.shape},{attention_map.shape}")
 
     # Normalize the attention map to [0, 1]
     normalized_map = (attention_map - attention_map.min()) / (attention_map.max() - attention_map.min())
@@ -203,6 +204,11 @@ def superimpose_original(original_map, attention_map,alpha=0.45):
     if original_map.ndim == 2:
         original_map = cv.cvtColor(original_map.astype(np.uint8), cv.COLOR_GRAY2BGR)  # Convert grayscale to RGB
 
+
+    # Ensure both images have the same type
+    # if original_map.dtype != colormap.dtype:
+    #     colormap = colormap.astype(original_map.dtype)
+
     # Blend the attention map with the original map
     # alpha = 0.45
     blended_image = cv.addWeighted(original_map, 1 - alpha, colormap, alpha, 0)
@@ -211,6 +217,50 @@ def superimpose_original(original_map, attention_map,alpha=0.45):
     final = cv.cvtColor(blended_image, cv.COLOR_BGR2RGB)
     final = (final - final.min()) / (final.max() - final.min())
     return final
+
+def superimpose_original(original_map, attention_map, alpha=0.45):
+    """
+    Superimpose the attention map onto the original map using a specified alpha for blending.
+
+    Args:
+        original_map (np.ndarray): The original map (image) array.
+        attention_map (np.ndarray): The attention map (image) array.
+        alpha (float): The alpha blending factor. Default is 0.45.
+
+    Returns:
+        np.ndarray: The final blended image array normalized to [0, 1].
+    """
+
+    original_map *= 255 
+
+    # Load the 1-channel images from .npy files
+    original_map = original_map.astype(np.uint8).squeeze()  # Ensure uint8 type
+    attention_map = attention_map.squeeze()
+    # print(f"shapes: {original_map.shape}, {attention_map.shape}")
+
+    # Normalize the attention map to [0, 1]
+    normalized_map = (attention_map - attention_map.min()) / (attention_map.max() - attention_map.min())
+
+    # Apply the 'jet' colormap to the normalized attention map
+    colormap = cv.applyColorMap((normalized_map * 255).astype(np.uint8), cv.COLORMAP_JET)
+
+    # Ensure both images have the same number of channels
+    if original_map.ndim == 2:
+        original_map = cv.cvtColor(original_map, cv.COLOR_GRAY2BGR)  # Convert grayscale to RGB
+
+    # Ensure both images have the same type
+    if original_map.dtype != colormap.dtype:
+        colormap = colormap.astype(original_map.dtype)
+
+    # Blend the attention map with the original map
+    blended_image = cv.addWeighted(original_map, 1 - alpha, colormap, alpha, 0)
+
+    # Normalize the final blended image to [0, 1] and convert it to RGB for visualization
+    final = cv.cvtColor(blended_image, cv.COLOR_BGR2RGB)
+    final = (final - final.min()) / (final.max() - final.min())
+
+    return final
+
 
 
 def normalize_image(image):

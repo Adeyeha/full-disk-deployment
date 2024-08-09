@@ -40,7 +40,7 @@ def convert_to_pix(lon, lat):
 # pix_list = [convert_to_pix(x[0],x[1]) for x in zip(dff.rest_lon.values[0],dff.rest_lat.values[0])]
 # pix_list = list(zip(dff.rest_fl.values[0],pix_list))
 
-def get_hulls(file_path,lower_threshold=10,upper_threshold=30,min_samples=2,distance_threshold=1,numpy=True): #should use uploaded image instead of file_path
+def get_hulls(file_path,original_file_path,lower_threshold=10,upper_threshold=30,min_samples=2,distance_threshold=1,numpy=True): #should use uploaded image instead of file_path
     """
     Get the convex hulls of the attribution map
     :param file_path: Path to the attribution map
@@ -73,6 +73,33 @@ def get_hulls(file_path,lower_threshold=10,upper_threshold=30,min_samples=2,dist
 
         return image
 
+    def remove_circular_mask(original_image, background_image):
+        # Ensure the images are in the correct format (8-bit grayscale)
+        if original_image.dtype != np.uint8:
+            original_image = (original_image / original_image.max() * 255).astype(np.uint8)
+        if background_image.dtype != np.uint8:
+            background_image = (background_image / background_image.max() * 255).astype(np.uint8)
+        
+        # Find the largest contour in the original image
+        _, thresholded_image = cv.threshold(original_image, 1, 255, cv.THRESH_BINARY)
+        contours, _ = cv.findContours(thresholded_image, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
+        largest_contour = max(contours, key=cv.contourArea)
+        
+        # Resize the background image to match the original image's dimensions
+        resized_background_image = cv.resize(background_image, (original_image.shape[1], original_image.shape[0]))
+        
+        # Create a mask for the largest contour
+        mask = np.zeros_like(resized_background_image, dtype=np.uint8)
+        cv.drawContours(mask, [largest_contour], -1, (255), thickness=cv.FILLED)
+        
+        # Superimpose the contour on the resized background image
+        superimposed_image = cv.bitwise_and(resized_background_image, resized_background_image, mask=mask)
+        
+        # Draw the circular edge in white on the superimposed image
+        cv.drawContours(superimposed_image, [largest_contour], -1, (0), thickness=8)
+
+        return superimposed_image
+
     if numpy == True:
         img = np.load(file_path)
         img = preprocess_image(img)
@@ -80,6 +107,9 @@ def get_hulls(file_path,lower_threshold=10,upper_threshold=30,min_samples=2,dist
 
     else:
         img = cv.Canny(trim_image(cv.imread(file_path, cv.IMREAD_GRAYSCALE)), lower_threshold, upper_threshold) # modify to use uploaded image
+
+
+    img = remove_circular_mask(np.load(original_file_path), img)
 
     #Extract the coordinates of the activation points
     points = np.argwhere(img == 255)
@@ -250,8 +280,8 @@ def  bounding_hulls(img,min_samples=2,distance_threshold=1):
 
 
     # Apply DBSCAN clustering
-    distance_threshold = min_samples
-    min_samples = distance_threshold
+    # distance_threshold = min_samples
+    # min_samples = distance_threshold
     dbscan = DBSCAN(eps=distance_threshold, min_samples=min_samples)
     dbscan.fit(points)
 
@@ -411,16 +441,16 @@ def collocation_ratio(distances):
     return collocation_ratio
 
 
-def explain(file, flares, nw_angle, sw_angle, es_buffer, ws_buffer,lower_threshold,upper_threshold,min_samples,distance_threshold, numpy=True):
+def explain(file,original_file_path, flares, nw_angle, sw_angle, es_buffer, ws_buffer,lower_threshold,upper_threshold,min_samples,distance_threshold, numpy=True):
     
     # Process and display the resulting image and dataframe
     if numpy:
-        activation_hulls = get_hulls(file,lower_threshold,upper_threshold,min_samples,distance_threshold,numpy=True)
+        activation_hulls = get_hulls(file,original_file_path,lower_threshold,upper_threshold,min_samples,distance_threshold,numpy=True)
     else:
-        activation_hulls = get_hulls(file,lower_threshold,upper_threshold,min_samples,distance_threshold,numpy=False)
-
+        activation_hulls = get_hulls(file,original_file_path,lower_threshold,upper_threshold,min_samples,distance_threshold,numpy=False)
     bouding_img = draw_bounding_region([x[1] for x in activation_hulls],nw_angle, sw_angle, es_buffer, ws_buffer)
     bounding_hulls_ = bounding_hulls(bouding_img,min_samples,distance_threshold)
+
     bounding_hulls_img = draw_hulls(bounding_hulls_, flares, activation_hulls=activation_hulls)
 
     distances = flare_hull_distance_2(flares, bounding_hulls_)
